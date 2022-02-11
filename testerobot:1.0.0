@@ -1,0 +1,93 @@
+FROM python:3.9.0-alpine3.12
+
+EXPOSE 80
+
+# Variavel de ambiente do diretorio de relatorios
+ENV ROBOT_REPORTS_DIR /opt/robotframework/reports
+
+# Variavel de ambiente do diretorio de testes
+ENV ROBOT_TESTS_DIR /opt/robotframework/tests
+
+# Variável de ambiente do diretorio de trabalho
+ENV ROBOT_WORK_DIR /opt/robotframework/temp
+
+# Define o numero de threads para execucao paralela
+ENV ROBOT_THREADS 1
+
+# Define usuario padrão para executar os testes
+ENV ROBOT_UID 1000
+ENV ROBOT_GID 1000
+
+# Versões
+ENV ALPINE_GLIBC 2.31-r0
+ENV AWS_CLI_VERSION 1.20.6
+ENV AXE_SELENIUM_LIBRARY_VERSION 2.1.6
+ENV BROWSER_LIBRARY_VERSION 6.0.0
+ENV CHROMIUM_VERSION 86.0
+ENV FAKER_VERSION 5.0.0
+ENV CHROME_VERSION 98
+ENV FTP_LIBRARY_VERSION 1.9
+ENV GECKO_DRIVER_VERSION v0.26.0
+ENV IMAP_LIBRARY_VERSION 0.4.0
+ENV PABOT_VERSION 2.0.1
+ENV REQUESTS_VERSION 0.9.1
+ENV ROBOT_FRAMEWORK_VERSION 4.1
+ENV SELENIUM_LIBRARY_VERSION 5.1.3
+ENV SSH_LIBRARY_VERSION 3.7.0
+ENV XVFB_VERSION 1.20
+ENV DISPLAY :20.0
+ENV SCREEN_GEOMETRY "1440x900x24"
+ENV CHROMEDRIVER_PORT 4444
+ENV CHROMEDRIVER_WHITELISTED_IPS "127.0.0.1"
+ENV CHROMEDRIVER_URL_BASE ''
+ENV CHROMEDRIVER_EXTRA_ARGS ''
+
+RUN apk update 
+RUN apk add curl
+
+# Instala outras dependencias 
+RUN apk --update add \
+    build-base \
+    jpeg-dev \
+    zlib-dev
+
+# Instala Chromedriver
+RUN CHROMEDRIVER_VERSION=`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE` && \
+    mkdir -p /opt/chromedriver-$CHROMEDRIVER_VERSION && \
+    curl -sS -o /tmp/chromedriver_linux64.zip http://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip && \
+    unzip -qq /tmp/chromedriver_linux64.zip -d /opt/chromedriver-$CHROMEDRIVER_VERSION && \
+    rm /tmp/chromedriver_linux64.zip && \
+    chmod +x /opt/chromedriver-$CHROMEDRIVER_VERSION/chromedriver && \
+    ln -fs /opt/chromedriver-$CHROMEDRIVER_VERSION/chromedriver /usr/local/bin/chromedriver
+
+# Instala  Robot Framework e Selenium Library
+RUN pip3 install --upgrade pip \
+    robotframework==3.1.1 \
+    robotframework-faker
+
+
+# Cria relatório padrão e as pastas de trabalho
+RUN mkdir -p ${ROBOT_REPORTS_DIR} \
+  && mkdir -p ${ROBOT_WORK_DIR} \
+  && chown ${ROBOT_UID}:${ROBOT_GID} ${ROBOT_REPORTS_DIR} \
+  && chown ${ROBOT_UID}:${ROBOT_GID} ${ROBOT_WORK_DIR} \
+  && chmod ugo+w ${ROBOT_REPORTS_DIR} ${ROBOT_WORK_DIR}
+
+# install chromedriver
+RUN wget "https://chromedriver.storage.googleapis.com/85.0.4183.87/chromedriver_linux64.zip"
+RUN unzip chromedriver_linux64.zip -d /usr/bin
+
+
+# Atualiza o caminho do sistema
+ENV PATH=/opt/robotframework/bin:/opt/robotframework/drivers:$PATH
+
+# Configura um volume para os relatorios gerados
+VOLUME ${ROBOT_REPORTS_DIR}
+
+USER ${ROBOT_UID}:${ROBOT_GID}
+
+# Pasta dedicada para permitir a criacao de arquivos temporarios
+WORKDIR ${ROBOT_WORK_DIR}
+
+# Executa todos os testes do Robot
+CMD ["run-tests-in-virtual-screen.sh"]
